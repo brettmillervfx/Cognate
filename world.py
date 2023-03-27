@@ -1,94 +1,89 @@
+import sys
+sys.path.append('D:\\projects')
+import cognate.knowledge as cog
+
 from enum import Enum
 
 
-class Agent:
-    def __init__(self, name:str) -> None:
-        self.name = name
+class Functor(Enum):
+    PATH = 0
+    DROP = 1
+    TELEPORTABLE = 2
+    DOWNSTAIRS = 3
+    UPSTAIRS = 4
+    OPEN_GATE = 5
+    CLOSED_GATE = 6
+    AT = 7
+    TRIGGER = 8
 
-class Exposure(Enum):
-    NO_COVER = 0
-    TOP_COVER = 1
-    SIDE_COVER = 2
-    HIDDEN = 3
+class Path(cog.Fact):
+    def __init__(self, node1, node2):
+        self.functor = Functor.PATH
+        self.arguments = (node1, node2) 
 
-class Node:
-    def __init__(self, name: str) -> None:
-        self.exposure = Exposure.NO_COVER
-        self.name = name
-        self.index = -1
+    def __repr__(self):
+        return f"Path {self.arguments}" 
 
-        self.egress = {} # dict[node_name] = edge
+class Drop(cog.Fact):
+    def __init__(self, node1, node2):
+        self.functor = Functor.DROP
+        self.arguments = (node1, node2)  
 
-    def set_index(self, index: int) -> None:
-        self.index = index
+    def __repr__(self):
+        return f"Drop {self.arguments}" 
 
-class LinkType(Enum):
-    TWO_WAY = 0
-    ONE_WAY = 1
-    DROP = 2
-    TELEPORT = 3
-    STAIRS_UP = 4       
+class Teleportable(cog.Fact):
+    def __init__(self, node1, node2):
+        self.functor = Functor.TELEPORTABLE
+        self.arguments = (node1, node2)
 
-class Edge:
-    def __init__(
-        self, 
-        from_node: str, 
-        to_node: str
-    ):
-        self.from_node = from_node
-        self.to_node = to_node
-        self.tight = False
-        self.gate_open = None
-        self.trigger_location = None
-        self.index = -1
+    def __repr__(self):
+        return f"Teleportable {self.arguments}" 
 
-    def set_index(self, index: int) -> None:
-        self.index = index
+class Downstairs(cog.Fact):
+    def __init__(self, node1, node2):
+        self.functor = Functor.DOWNSTAIRS
+        self.arguments = (node1, node2)  
 
-    def make_gate(self, open: bool, trigger_location: str) -> None
-        self.gate_open = open
-        self.trigger_location = trigger_location
+    def __repr__(self):
+        return f"Downstairs {self.arguments}" 
 
+class Upstairs(cog.Fact):
+    def __init__(self, node1, node2):
+        self.functor = Functor.UPSTAIRS
+        self.arguments = (node1, node2) 
 
-class World:
-    def __init__(self):
-        self.nodes = []
-        self.node_name_to_index = {} # dict[str] = int
+    def __repr__(self):
+        return f"Upstairs {self.arguments}" 
 
-        self.edges = []
+class OpenGate(cog.Fact):
+    def __init__(self, node1, node2):
+        self.functor = Functor.OPEN_GATE
+        self.arguments = (node1, node2) 
 
-        # layered state like knowledge has
+    def __repr__(self):
+        return f"OpenGate {self.arguments}" 
 
-    def add_node(self, name: str) -> Node:
-        """ add node and return handle to it for configuration"""
-        new_node = Node(name)
-        node_index = len(self.nodes)
-        new_node.set_index(node_index)
-        self.nodes.append(new_node)
-        self.node_name_to_index[name] = new_node
-        return new_node
+class ClosedGate(cog.Fact):
+    def __init__(self, node1, node2):
+        self.functor = Functor.CLOSED_GATE
+        self.arguments = (node1, node2) 
 
-    def add_edge(self, from_node: str, to_node: str) -> Edge:
-        """ add edge and return handle for configuration """
-        new_edge = Edge(from_node, to_node)
-        edge_index = len(self.edges)
-        new_edge.set_index(edge_index)
-        self.edges.append(new_edge)
-        return new_edge
+    def __repr__(self):
+        return f"ClosedGate {self.arguments}" 
 
+class At(cog.Fact):
+    def __init__(self, agent, node):
+        self.functor = Functor.AT
+        self.arguments = (agent, node) 
 
-""" 
-I need a way to query the world state -- what do such queries look like? Do we maintain predicate logic?
-I need a way to layer overrides.
-A query is posed to an override layer.
-Which is a stack.
+    def __repr__(self):
+        return f"At {self.arguments}" 
 
-Is a query a lambda?
+class Trigger(cog.Fact):
+    def __init__(self, gate1, gate2, trigger_location):
+        self.functor = Functor.TRIGGER
+        self.arguments = (gate1, gate2, trigger_location) 
 
-
-new_layer = override_stack.push()
-query = Query([bandit_1.location.count_inhabitants(bandits)>2]) # Is my bandit in a room with at least 2 other bandits?
-override_stack.pop()
-
-And this in turn leads to questions about 
-"""
+    def __repr__(self):
+        return f"Trigger {self.arguments}" 
