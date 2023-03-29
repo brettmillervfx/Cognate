@@ -1,10 +1,12 @@
 import sys
 sys.path.append('D:\\projects')
 import cognate.knowledge as cog
-import cognate.world as world
-import cognate.bandits as band
 import cognate.heuristic as heu
 import cognate.search as search
+
+import cognate.world as world
+import cognate.bandits as band
+import cognate.miniboss as miniboss
 
 import copy
 
@@ -135,21 +137,36 @@ def test_search_hard():
     # this isn't determinsitic
     print(f"generated {s.dc_count} states") 
 
+def test_miniboss_goal_queue():
+    k = define_trigger_maze()
+
+    mb = miniboss.Miniboss('Miniboss')
+    mb.set_goal(world.At('Miniboss', 'end'))
+    k.append( world.At('Miniboss', 'start') ) 
+
+    s = search.SearchPlan(k, mb)
+    plan = s.plan()
+
+    for p in plan:
+        print(p)
 
 
 
 if __name__ == "__main__" : 
-    print('----- test_trigger -----')
-    test_trigger() 
+    # print('----- test_trigger -----')
+    # test_trigger() 
 
-    print('----- test_move_action -----')
-    test_move_action() 
+    # print('----- test_move_action -----')
+    # test_move_action() 
 
-    print('----- test_relaxed_planning_graph -----')
-    test_relaxed_planning_graph() 
+    # print('----- test_relaxed_planning_graph -----')
+    # test_relaxed_planning_graph() 
 
-    print('----- test_search_easy -----')
-    test_search_easy() 
+    # print('----- test_search_easy -----')
+    # test_search_easy() 
 
-    print('----- test_search_hard -----')
-    test_search_hard() 
+    # print('----- test_search_hard -----')
+    # test_search_hard() 
+
+    print('----- test_miniboss_goal_queue -----')
+    test_miniboss_goal_queue() 

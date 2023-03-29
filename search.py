@@ -3,7 +3,7 @@ import cognate.heuristic as heu
 
 
 class State:
-    def __init__(self, knowledge, agent, action=None):
+    def __init__(self, knowledge, agent, timestamp, action=None):
         self.agent = agent
         
         # This will lead to performance issues I think.
@@ -13,12 +13,19 @@ class State:
         # regardless, we'll want to measure how much allocation we're doing....
         self.knowledge = copy.deepcopy(knowledge)
         
-        # action is what effected this state. Nonne signifies that it is initial conditions
+        # action is what effected this state. None signifies that it is initial conditions
         self.action = action
+
+        # Each state is timestamped from the original state
+        self.timestamp = timestamp
 
         # we immediately generate heuristic for this state and helpful actions
         rpg = heu.RelaxedPlanningGraph(self.knowledge, self.agent)
         self.heuristic, self.actions = rpg.generate_heuristic()
+        
+        # timestamp all actions
+        for action in self.actions:
+            action.timestamp = self.timestamp 
 
     def get_successors(self):
         """ generate successor states from each helpful action """
@@ -36,7 +43,7 @@ class State:
                     self.knowledge.append(add)
                 for delete in deletes:
                     self.knowledge.remove(delete)
-                successors.append(State(self.knowledge, self.agent, action))
+                successors.append(State(self.knowledge, self.agent, self.timestamp+1, action))
                 self.knowledge.pop_layer()
 
         return sorted(successors, key=lambda s: s.heuristic)
@@ -51,7 +58,7 @@ class State:
 
 class SearchPlan:
     def __init__(self, knowledge, agent):
-        self.curr_state = State(knowledge, agent)
+        self.curr_state = State(knowledge, agent, 0)
         self.dc_count = 0
 
     def plan(self):

@@ -96,6 +96,7 @@ class MoveAction:
 
         self.add_list = set()
         self.delete_list = set()
+        self.timestamp = None
 
     def meets_preconditions(self, knowledge: cog.KnowledgeStack):
         can_move = self.can_move_rule.test(knowledge)
@@ -134,6 +135,7 @@ class TriggerAction:
 
         self.add_list = set()
         self.delete_list = set()
+        self.timestamp = None
 
         self.location = None
 
