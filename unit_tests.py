@@ -150,6 +150,29 @@ def test_miniboss_goal_queue():
     for p in plan:
         print(p)
 
+def test_knowledge_base_predictions():
+    k = define_trigger_maze()
+    print(f"true: {k.check_fact(world.ClosedGate('path_a', 'trigger_a'))}")   
+    
+    k.predict_add(world.OpenGate('path_a', 'trigger_a'), time=4)
+    k.predict_remove(world.ClosedGate('path_a', 'trigger_a'), time=4)
+
+    print(f"true: {k.check_fact(world.ClosedGate('path_a', 'trigger_a'))}") 
+
+    # The gate is closed now, but will it ever be opened?
+    print(f"true: {k.check_prediction(world.ClosedGate('path_a', 'trigger_a'), removal=True)}") 
+
+    print(f"adds at 4: {k.predictions.get_predicted_adds(4)}")
+    print(f"removes at 4: {k.predictions.get_predicted_removes(4)}")
+
+    # add 4 layers to k and test the facts
+    print(f"push {k.push_layer()}")
+    print(f"push {k.push_layer()}")
+    print(f"push {k.push_layer()}")
+    print(f"is the gate open? {k.check_fact(world.OpenGate('path_a', 'trigger_a'))}")
+    print(f"push {k.push_layer()}")
+    print(f"is the gate open? {k.check_fact(world.OpenGate('path_a', 'trigger_a'))}")
+
 
 
 if __name__ == "__main__" : 
@@ -168,5 +191,8 @@ if __name__ == "__main__" :
     # print('----- test_search_hard -----')
     # test_search_hard() 
 
-    print('----- test_miniboss_goal_queue -----')
-    test_miniboss_goal_queue() 
+    # print('----- test_miniboss_goal_queue -----')
+    # test_miniboss_goal_queue() 
+
+    print('----- test_knowledge_base_predictions -----')
+    test_knowledge_base_predictions() 

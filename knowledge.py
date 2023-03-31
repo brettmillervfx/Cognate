@@ -35,9 +35,9 @@ class Variable:
 
 
 class Fact:
-    def __init__(self):
-        self.functor = None
-        self.arguments = ()
+    def __init__(self, functor=None, arguments=()):
+        self.functor = functor
+        self.arguments = arguments
 
     def __eq__(self, other) -> bool:
         """ Compare the two fixed axioms """
@@ -52,6 +52,9 @@ class Fact:
     
     def __hash__(self):
         return hash((self.functor, self.arguments))
+    
+    def __repr__(self):
+        return f"{self.functor.name} -> {self.arguments}"
     
     
 class Proposal():
@@ -94,7 +97,7 @@ class BaseKnowledge():
         except KeyError:
             self.facts[fact.functor] = {fact.arguments}
 
-    def test(self, fact: Fact):
+    def test(self, fact: Fact) -> bool:
         """ Test if the proposed fact is known. """
         return fact.arguments in self.facts[fact.functor]
     
@@ -104,6 +107,75 @@ class BaseKnowledge():
                 proposal.consider(fact_arguments)
         else: # this is a Rule
             proposal.solve(self)
+
+
+class PredictedKnowledge():
+    """ Tranches of knowledge that are predicted to be true at a future date.
+    """
+    def __init__(self):
+        """ 
+        Facts are arranged by functor, as with BaseKnowledge.
+        Each functor has a dictionary mapping known argument tuples to timestamps when the fact will be
+        added or removed.
+        """
+        self.added_facts = {}
+        self.removed_facts = {}
+
+    def append_add(self, fact: Fact, time: int) -> None:
+        try:
+            tranch = self.added_facts[fact.functor]
+            try:
+                tranch[fact.arguments] = min(time, tranch[fact.arguments])
+            except KeyError:
+                tranch[fact.arguments] = time
+        except KeyError:
+            self.added_facts[fact.functor] = {fact.arguments: time}
+
+    def append_remove(self, fact: Fact, time: int) -> None:
+        try:
+            tranch = self.removed_facts[fact.functor]
+            try:
+                tranch[fact.arguments] = min(time, tranch[fact.arguments])
+            except KeyError:
+                tranch[fact.arguments] = time
+        except KeyError:
+            self.removed_facts[fact.functor] = {fact.arguments: time}
+
+    def test_addition(self, fact: Fact) -> int:
+        """ 
+        Test if the proposed fact is predicted to be added.
+        Returns a -1 if it is not, otherwise the relative timestamp at which it is predicted to be true.
+        """
+        try:
+            return self.added_facts[fact.functor][fact.arguments]
+        except KeyError:
+            return -1
+        
+    def test_removal(self, fact: Fact) -> int:
+        """ 
+        Test if the proposed fact is predicted to be removed.
+        Returns a -1 if it is not, otherwise the relative timestamp at which it is predicted to be true.
+        """
+        try:
+            return self.removed_facts[fact.functor][fact.arguments]
+        except KeyError:
+            return -1
+        
+    def get_predicted_adds(self, time: int) -> List[Fact]:
+        adds = []
+        for functor,tranch in self.added_facts.items():
+            for arguments,prediction_time in tranch.items():
+                if time == prediction_time:
+                    adds.append(Fact(functor, arguments))
+        return adds
+    
+    def get_predicted_removes(self, time: int) -> List[Fact]:
+        removes = []
+        for functor,tranch in self.removed_facts.items():
+            for arguments,prediction_time in tranch.items():
+                if time == prediction_time:
+                    removes.append(Fact(functor, arguments))
+        return removes
         
 
 class KnowledgeDelta:
@@ -129,15 +201,29 @@ class KnowledgeDelta:
 
         functor_set.add(fact.arguments)
 
+
 class KnowledgeStack:
-    def __init__(self):
+    def __init__(self, base_knowledge=None):
+        if base_knowledge is None:
+            self.base = BaseKnowledge()
+        else:
+            self.base = base_knowledge
+        
         self.current_layer = 0
-        self.base = BaseKnowledge()
         self.layers = []
+        self.predictions = PredictedKnowledge()
 
     def push_layer(self) -> int:
         self.current_layer += 1
         self.layers.append(KnowledgeDelta())
+
+        # realize predictions
+        for fact in self.predictions.get_predicted_adds(self.current_layer):
+            self.append(fact)
+
+        for fact in self.predictions.get_predicted_removes(self.current_layer):
+            self.remove(fact)
+
         return self.current_layer 
 
     def pop_layer(self) -> int:
@@ -209,4 +295,16 @@ class KnowledgeStack:
             return 0
         
         return len(self.layers[self.current_layer-1].adds)
+    
+    def predict_add(self, fact: Fact, time: int) -> None:
+        self.predictions.append_add(fact, time)
+
+    def predict_remove(self, fact: Fact, time: int) -> None:
+        self.predictions.append_remove(fact, time)
+
+    def check_prediction(self, fact: Fact, removal=False) -> int:
+        if removal:
+            return self.predictions.test_removal(fact)
+        else:
+            return self.predictions.test_removal(fact)
 
