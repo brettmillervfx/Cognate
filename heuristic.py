@@ -1,12 +1,13 @@
 from typing import Tuple, List
 from functools import reduce
+import copy
 
 # The heuristic value that says "don't go here"
 DEAD_END = 99999
 
 class RelaxedPlanningGraph:
     def __init__(self, knowledge, agent):
-        self.knowledge = knowledge
+        self.knowledge = copy.deepcopy(knowledge)
         self.agent = agent
         self.goal = agent.goal
 
@@ -39,7 +40,7 @@ class RelaxedPlanningGraph:
             # that aren't already in the knowledge stack
             self.knowledge.push_layer() 
             for action in valid_actions:
-                adds = action.generate_add_list(self.knowledge) 
+                adds = action.generate_adds(self.knowledge) 
                 for add in adds:
                     self.knowledge.append(add)
 
@@ -75,7 +76,7 @@ class RelaxedPlanningGraph:
                 found = False
                 for l in range(layer+1):
                     for action in self.plan[l]:
-                        if pc in action.add_list:
+                        if pc in action.adds:
                             found = True
                             helpful_actions[l].add(action)
                             preconditions[l].update(action.dependencies)

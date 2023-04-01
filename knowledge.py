@@ -115,7 +115,7 @@ class PredictedKnowledge():
     def __init__(self):
         """ 
         Facts are arranged by functor, as with BaseKnowledge.
-        Each functor has a dictionary mapping known argument tuples to timestamps when the fact will be
+        Each functor has a set of argument/timestamp tuples
         added or removed.
         """
         self.added_facts = {}
@@ -123,59 +123,51 @@ class PredictedKnowledge():
 
     def append_add(self, fact: Fact, time: int) -> None:
         try:
-            tranch = self.added_facts[fact.functor]
-            try:
-                tranch[fact.arguments] = min(time, tranch[fact.arguments])
-            except KeyError:
-                tranch[fact.arguments] = time
+            tranch = self.added_facts[fact.functor] 
+            tranch.add((fact.arguments, time))          
         except KeyError:
-            self.added_facts[fact.functor] = {fact.arguments: time}
+            self.added_facts[fact.functor] = {(fact.arguments, time)}
 
     def append_remove(self, fact: Fact, time: int) -> None:
         try:
             tranch = self.removed_facts[fact.functor]
+            tranch.add((fact.arguments, time)) 
+        except KeyError:
+            self.removed_facts[fact.functor] = {(fact.arguments, time)}
+        
+    def get_predicted_adds(self, time: int, functor=None):
+        adds = set()
+        if functor is not None:
             try:
-                tranch[fact.arguments] = min(time, tranch[fact.arguments])
+                for arguments,prediction_time in self.added_facts[functor]:
+                    if time == prediction_time:
+                        adds.add(arguments)
+                return adds
             except KeyError:
-                tranch[fact.arguments] = time
-        except KeyError:
-            self.removed_facts[fact.functor] = {fact.arguments: time}
-
-    def test_addition(self, fact: Fact) -> int:
-        """ 
-        Test if the proposed fact is predicted to be added.
-        Returns a -1 if it is not, otherwise the relative timestamp at which it is predicted to be true.
-        """
-        try:
-            return self.added_facts[fact.functor][fact.arguments]
-        except KeyError:
-            return -1
-        
-    def test_removal(self, fact: Fact) -> int:
-        """ 
-        Test if the proposed fact is predicted to be removed.
-        Returns a -1 if it is not, otherwise the relative timestamp at which it is predicted to be true.
-        """
-        try:
-            return self.removed_facts[fact.functor][fact.arguments]
-        except KeyError:
-            return -1
-        
-    def get_predicted_adds(self, time: int) -> List[Fact]:
-        adds = []
-        for functor,tranch in self.added_facts.items():
-            for arguments,prediction_time in tranch.items():
-                if time == prediction_time:
-                    adds.append(Fact(functor, arguments))
-        return adds
-    
-    def get_predicted_removes(self, time: int) -> List[Fact]:
-        removes = []
-        for functor,tranch in self.removed_facts.items():
-            for arguments,prediction_time in tranch.items():
-                if time == prediction_time:
-                    removes.append(Fact(functor, arguments))
-        return removes
+                return adds
+        else:
+            for functor,tranch in self.added_facts.items():
+                for arguments,prediction_time in tranch:
+                    if time == prediction_time:
+                        adds.add(Fact(functor, arguments))
+            return adds
+ 
+    def get_predicted_removes(self, time: int, functor=None):
+        removes = set()
+        if functor is not None:
+            try:
+                for arguments,prediction_time in self.removed_facts[functor]:
+                    if time == prediction_time:
+                        removes.add(arguments)
+                return removes
+            except: 
+                return removes
+        else:
+            for functor,tranch in self.removed_facts.items():
+                for arguments,prediction_time in tranch:
+                    if time == prediction_time:
+                        removes.add(Fact(functor, arguments))
+            return removes
         
 
 class KnowledgeDelta:
@@ -203,15 +195,23 @@ class KnowledgeDelta:
 
 
 class KnowledgeStack:
-    def __init__(self, base_knowledge=None):
+    def __init__(self, base_knowledge=None, predictions=None):
         if base_knowledge is None:
             self.base = BaseKnowledge()
         else:
             self.base = base_knowledge
+
+        if predictions is None:
+            self.predictions = PredictedKnowledge()
+        else:
+            self.predictions = predictions    
         
         self.current_layer = 0
         self.layers = []
-        self.predictions = PredictedKnowledge()
+        
+    def clone(self):
+        knowledge_clone = KnowledgeStack(self.base, self.predictions)
+        return knowledge_clone
 
     def push_layer(self) -> int:
         self.current_layer += 1
@@ -225,6 +225,16 @@ class KnowledgeStack:
             self.remove(fact)
 
         return self.current_layer 
+    
+    def advance_to(self, time: int):
+        while self.current_layer < time:
+            self.push_layer()
+
+    def rebuild_layers(self):
+        self.layers.clear()
+        time = self.current_layer
+        self.current_layer = 0
+        self.advance_to(time)
 
     def pop_layer(self) -> int:
         if self.current_layer == 0:
@@ -262,11 +272,18 @@ class KnowledgeStack:
         while layer <= self.current_layer:
             # add and remove according to current layer
             if functor in self.layers[layer-1].adds:
-                for args in self.layers[layer-1].adds[functor]:
-                    flattened.add(args)
+                for arguments in self.layers[layer-1].adds[functor]:
+                    flattened.add(arguments)
             if functor in self.layers[layer-1].deletes:
-                for args in self.layers[layer-1].deletes[functor]:
-                    flattened.discard(args)
+                for arguments in self.layers[layer-1].deletes[functor]:
+                    flattened.discard(arguments)
+            
+            # # realize predictions
+            # for arguments in self.predictions.get_predicted_adds(layer, functor):
+            #     flattened.add(arguments)
+
+            # for arguments in self.predictions.get_predicted_removes(layer, functor):
+            #     flattened.discard(arguments)
                 
             layer += 1
 
@@ -298,9 +315,19 @@ class KnowledgeStack:
     
     def predict_add(self, fact: Fact, time: int) -> None:
         self.predictions.append_add(fact, time)
+        if time <= self.current_layer:
+            curr = self.current_layer
+            self.current_layer = time
+            self.append(fact)
+            self.current_layer = curr
 
     def predict_remove(self, fact: Fact, time: int) -> None:
         self.predictions.append_remove(fact, time)
+        if time <= self.current_layer:
+            curr = self.current_layer
+            self.current_layer = time
+            self.remove(fact)
+            self.current_layer = curr
 
     def check_prediction(self, fact: Fact, removal=False) -> int:
         if removal:

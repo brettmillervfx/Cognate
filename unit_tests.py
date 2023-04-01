@@ -7,6 +7,7 @@ import cognate.search as search
 import cognate.world as world
 import cognate.bandits as band
 import cognate.miniboss as miniboss
+from cognate.central import CentralPlanner
 
 import copy
 
@@ -71,8 +72,8 @@ def test_move_action():
 
     for action in actions:
         print(action.meets_preconditions(k))
-        print(action.generate_add_list(k))
-        print(action.generate_delete_list(k))
+        print(action.generate_adds(k))
+        print(action.generate_removes(k))
         print('---')
 
 
@@ -173,6 +174,76 @@ def test_knowledge_base_predictions():
     print(f"push {k.push_layer()}")
     print(f"is the gate open? {k.check_fact(world.OpenGate('path_a', 'trigger_a'))}")
 
+def test_contracting():
+    bandits = {}
+    b_a = band.Bandit("bandit_A")  
+    bandits["bandit_A"] = b_a
+    b_b = band.Bandit("bandit_B")
+    bandits["bandit_B"] = b_b
+    
+    k = define_trigger_maze()
+    k.append( world.At('bandit_A', 'start') )
+    k.append( world.At('bandit_B', 'path_b') )
+
+    goal = world.At('bandit_B', 'path_b3')
+
+    b_a.set_knowledge(k)
+    print(b_a.supply_bid(world.OpenGate ('path_b1', 'path_b2')))
+
+    cp = CentralPlanner(k.base, bandits)
+    print(cp.contract(world.OpenGate('path_a', 'trigger_a')))
+    
+def test_self_contracting():
+    bandits = {}
+    b_a = band.Bandit("bandit_A")  
+    bandits["bandit_A"] = b_a
+    
+    k = define_trigger_maze()
+    k.append( world.At('bandit_A', 'start') )
+
+    goal = world.OpenGate('path_b1', 'path_b2')
+    cp = CentralPlanner(k.base, bandits)
+    print(cp.plan('bandit_A', goal))
+    cp.admit_plans()
+
+
+def test_cooperation():
+    bandits = {}
+    b_a = band.Bandit("bandit_A")  
+    bandits["bandit_A"] = b_a
+    b_b = band.Bandit("bandit_B")
+    bandits["bandit_B"] = b_b
+    
+    k = define_trigger_maze()
+    k.append( world.At('bandit_A', 'start') )
+    k.append( world.At('bandit_B', 'start') )
+
+    goal = world.At('bandit_B', 'path_b3')
+    cp = CentralPlanner(k.base, bandits)
+    print(cp.plan('bandit_B', goal))
+    cp.admit_plans()
+
+def test_miniboss_contracting():
+    agents = {}
+    b_a = band.Bandit("bandit_A")  
+    agents["bandit_A"] = b_a
+    b_b = band.Bandit("bandit_B")
+    agents["bandit_B"] = b_b
+    mb = miniboss.Miniboss("miniboss")
+    agents["miniboss"] = mb
+    
+    k = define_trigger_maze()
+    k.append( world.At('bandit_A', 'start') )
+    k.append( world.At('bandit_B', 'start') )
+    k.append( world.At('miniboss', 'start') )
+
+    goal = world.At('miniboss', 'end')
+    cp = CentralPlanner(k.base, agents)
+    print(cp.plan('miniboss', goal))
+    cp.admit_plans()  
+
+
+
 
 
 if __name__ == "__main__" : 
@@ -194,5 +265,17 @@ if __name__ == "__main__" :
     # print('----- test_miniboss_goal_queue -----')
     # test_miniboss_goal_queue() 
 
-    print('----- test_knowledge_base_predictions -----')
-    test_knowledge_base_predictions() 
+    # print('----- test_knowledge_base_predictions -----')
+    # test_knowledge_base_predictions() 
+
+    # print('----- test_contracting -----')
+    # test_contracting() 
+
+    # print('----- test_self_contracting -----')
+    # test_self_contracting() 
+
+    # print('----- test_cooperation -----')
+    # test_cooperation() 
+
+    print('----- test_miniboss_contracting -----')
+    test_miniboss_contracting() 

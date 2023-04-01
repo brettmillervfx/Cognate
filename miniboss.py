@@ -6,6 +6,7 @@ import sys
 sys.path.append('D:\\projects')
 import cognate.knowledge as cog
 import cognate.world as world
+import cognate.agent as agent
 
 
 """
@@ -61,26 +62,16 @@ class CanMoveRule:
         
         return found
 
-
-class MoveAction:
+class MoveAction(agent.Action):
     def __init__(self, agent, location):
+        super().__init__()
+
         # these values are fixed, necessarily
         self.agent = agent
         self.location = location
         self.prev_location = None
 
         self.can_move_rule = CanMoveRule(self.agent, self.location)
-
-        self.dependencies = set()
-
-        self.add_list = set()
-        self.delete_list = set()
-
-        # Miniboss is specific about when this action will occur
-        self.timestamp = None
-
-        # Miniboss may need a gate to be opened, expressed as a goal
-        self.required_goal = None
 
     def meets_preconditions(self, knowledge: cog.KnowledgeStack):
         can_move = self.can_move_rule.test(knowledge)
@@ -92,16 +83,16 @@ class MoveAction:
         self.required_goal = self.can_move_rule.required_goal
         return True
 
-    def generate_add_list(self, knowledge: cog.KnowledgeStack):
-        self.add_list = {world.At(self.agent, self.location)}
-        return self.add_list
+    def generate_adds(self, knowledge: cog.KnowledgeStack):
+        self.adds = {world.At(self.agent, self.location)}
+        return self.adds
     
-    def generate_delete_list(self, knowledge: cog.KnowledgeStack):
+    def generate_removes(self, knowledge: cog.KnowledgeStack):
         # we sometimes have multiple prev_locations
         prevs = set(self.prev_location)
         for prev in prevs:
-            self.delete_list.add(world.At(self.agent, prev))
-        return self.delete_list
+            self.removes.add(world.At(self.agent, prev))
+        return self.removes
     
     def __repr__(self):
         try:
@@ -114,24 +105,31 @@ class MoveAction:
         return ret
     
     def hash(self):
-        return hash((self.dependencies, self.add_list, self.add_list, 'move'))
-    
+        return hash((self.dependencies, self.adds, self.removes, 'move'))
+   
 
-class Miniboss():
+class Miniboss(agent.Agent):
     def __init__(self, name):
-        self.name = name
-        self.goal = None
-
-    def set_goal(self, goal):
-        self.goal = goal
+        super().__init__(name)
 
     def produce_valid_actions(self, knowledge: cog.KnowledgeStack):
         valid_actions = []
+        
+        # Where am I?
         current_location = cog.Variable()
         knowledge.find_possible_solutions( cog.Proposal( world.Functor.AT, (self.name, current_location) ) )
         if len(current_location.possible_values) == 0:
-            return [] # maybe bandit is dead?
+            return [] # maybe agent is dead?
         
+        # Notes on how to produce a possible wait state:
+        # When I ask knowledge for possible solutions, we would want to know about possible future solutions as
+        # well in case we want to wait in place.
+        # knowledge.find_possible_solutions( cog.Proposal( world.Functor.PATH, (current_location, destinations) ) )
+        # should then return solutions now.
+        # knowledge.find_future_solutions( cog.Proposal( world.Functor.PATH, (current_location, destinations) ) )
+        #
+        
+        # Where can I go?
         # with relaxed planning, miniboss may be in multiple locations at once
         for current_location in current_location.possible_values:
             destinations = cog.Variable()

@@ -12,7 +12,7 @@ class State:
         # Previously I think I had a 'clone' function to do this.
         # regardless, we'll want to measure how much allocation we're doing....
         self.knowledge = copy.deepcopy(knowledge)
-        
+       
         # action is what effected this state. None signifies that it is initial conditions
         self.action = action
 
@@ -25,15 +25,15 @@ class State:
         
         # timestamp all actions
         for action in self.actions:
-            action.timestamp = self.timestamp 
+            action.timestamp = self.timestamp+1 
 
     def get_successors(self):
         """ generate successor states from each helpful action """
         successors = []
         for action in self.actions:
             if action.meets_preconditions(self.knowledge):
-                adds = action.generate_add_list(self.knowledge)
-                deletes = action.generate_delete_list(self.knowledge)
+                adds = action.generate_adds(self.knowledge)
+                deletes = action.generate_removes(self.knowledge)
                 
                 if self.is_taboo(action):
                     continue
@@ -54,11 +54,11 @@ class State:
         """
         if self.action is None:
             return False
-        return self.action.add_list == successor.delete_list and self.action.delete_list == successor.add_list       
+        return self.action.adds == successor.removes and self.action.removes == successor.adds    
 
 class SearchPlan:
     def __init__(self, knowledge, agent):
-        self.curr_state = State(knowledge, agent, 0)
+        self.curr_state = State(knowledge, agent, knowledge.current_layer)
         self.dc_count = 0
 
     def plan(self):
